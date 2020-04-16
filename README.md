@@ -10,4 +10,5 @@ I like old hardware, because usually it is "simpler". Programming might not be v
 
 ## Status of the game
 Right now, the game is veeery new, you just move the spaceship side to side and shoot 4 plasma projectiles, and that's it.
+
 ![Screenshot of the proto-02 version](screenshots/proto-02.png)
