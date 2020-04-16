@@ -8,9 +8,12 @@
 
   .rsset $0000
 	
-score	.rs 2	; player 1 gamepad buttons, one bit per button
-seed	.rs 1	; Seed for the Pseudo Random Number Generator
-rand	.rs 1
+score		.rs 2	; player 1 gamepad buttons, one bit per button
+seed		.rs 1	; Seed for the Pseudo Random Number Generator
+rand		.rs 1	; Address to store random number
+nextPPUAddr	.rs 1	; Address to store the next PPU address available to copy
+ballXAddr	.rs 1	; Address to store projectile's X coord when spawned
+cooldown	.rs 1	; Address to store projectile's cooldown after shooting
 
 
 
@@ -53,6 +56,16 @@ LoadPalettesLoop:
 	CPX #$20             	; Compare X to hex $10, decimal 16 - copying 16 bytes = 4 sprites
 	BNE LoadPalettesLoop  	; Branch to LoadPalettesLoop if compare was Not Equal to zero
 							; if compare was equal to 32, keep going down
+							
+							
+ClearPPU:
+	LDA #$FF				; We use FF sprite, which is blank on the chr file
+	LDX #$00
+ClearPPULoop:
+	STA $0200, X			; Set ppu address to zero ($0200 + x)
+	INX
+	CPX #$FF
+	BNE ClearPPULoop		; If X != FF repeat, will clear $0200-$02FF
 
 LoadSprites:
 	LDX #$00				; start at 0
@@ -65,7 +78,6 @@ LoadSpritesLoop:
 							; if compare was equal to 16, continue down
 
 
-
 	LDA #%10010000	; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
 	STA $2000
 
@@ -74,6 +86,12 @@ LoadSpritesLoop:
 	
 	LDA #$3E
 	STA seed
+	
+	LDA #$10		; $0210 will be the start for the projectiles, will extend until $0220
+	STA nextPPUAddr
+	
+	LDA #$00
+	STA cooldown
 
 main:
 	JMP main		;jump back to main, infinite loop, waiting for NMI
@@ -98,7 +116,70 @@ NMI:				; Aki komiensa la peska
 	STA $2005
     
 	; All graphics updates done by here, run game engine
+
+IncreaseCooldown:
+	INC cooldown	; Increase cooldown every frame
+
+
+ProjectileTravel:	; Decrease the 4 projectiles' Y coord (Y = 0 equals top of the screen)
+	DEC $0210
+	DEC $0210
+	DEC $0210
+	DEC $0214
+	DEC $0214
+	DEC $0214
+	DEC $0218
+	DEC $0218
+	DEC $0218
+	DEC $021C
+	DEC $021C
+	DEC $021C
+CheckTravelEnd:		; If the projectiles reach the top of the screen they despawn
+	LDX $0210
+	CPX #$10
+	BEQ despawnProjectile1
+check2:
+	LDX $0214
+	CPX #$10
+	BEQ despawnProjectile2
+check3:
+	LDX $0218
+	CPX #$10
+	BEQ despawnProjectile3
+check4:
+	LDX $021C
+	CPX #$10
+	BEQ despawnProjectile4
+	JMP LatchController		; Jump to read controller input
 	
+despawnProjectile1:
+	LDA #$FF				; We will use sprite FF (which is blank on the chr file)
+	STA $0210
+	STA $0211
+	STA $0212
+	STA $0213
+	JMP check2		; Jump back to check projectile 2
+despawnProjectile2:
+	LDA #$FF
+	STA $0214
+	STA $0215
+	STA $0216
+	STA $0217
+	JMP check3
+despawnProjectile3:
+	LDA #$FF
+	STA $0218
+	STA $0219
+	STA $021A
+	STA $021B
+	JMP check4
+despawnProjectile4:
+	LDA #$FF
+	STA $021C
+	STA $021D
+	STA $021E
+	STA $021F
+	; No Jump instruction required, continue to read input
 
 LatchController:
   LDA #$01
@@ -112,6 +193,11 @@ ReadA:
   AND #%00000001	; only look at bit 0
   BEQ ReadADone		; branch to ReadADone if button is NOT pressed (0)
 					; add instructions here to do something when button IS pressed (1)
+
+	LDX cooldown
+	CPX #$20				
+	BPL spawnProjectile	; If cooldown >= hex 20, shoot projectile
+	
 
 ReadADone:			; handling this button is done
   
@@ -191,7 +277,7 @@ ReadRightDone:		; handling this button is done
   
   RTI             ; return from interrupt
 
-
+;********** SUBROUTINES **********;
 
 generatePrng:		; Pseudo Random Number Generator, probably not the best in the world
 	LDA seed
@@ -201,8 +287,59 @@ generatePrng:		; Pseudo Random Number Generator, probably not the best in the wo
 	ROL A
 	TAX
 	ADC rand,X
+	RTS
+	
+
+spawnProjectile:
 
 
+	LDX #$00			; Reset cooldown
+	STX cooldown
+	
+	LDX $0207			; Get spaceship's top-left X coord, which is the closest to the middle of the ship
+	DEX					; Decrease the coord 2 pixels, to alineate it in the center of the ship (the projectile is 4 pixels wide)
+	DEX
+
+	STX ballXAddr		; Store the coord as the ball's spawning X coord
+
+	LDX #$00
+	LDY nextPPUAddr
+	CPY #$20
+	BPL noProjectilePPUTooHigh
+	
+	
+	LDA projectile, X	; load data from address (projectile + x)
+	STA $0200, Y		; store into RAM address ($0200 + y)
+	INY
+	INX
+
+	LDA projectile, X	; load data from address (projectile + x)
+	STA $0200, Y		; store into RAM address ($0200 + y)
+	INY
+	INX
+	
+	LDA projectile, X	; load data from address (projectile + x)
+	STA $0200, Y		; store into RAM address ($0200 + y)
+	INY					; Only increase Y, because X isn't needed for loading the x coord of the projectile
+
+
+	LDA ballXAddr
+	STA $0200, Y
+	INY					; Increase Y by one to store it on nextPPUAddr as the next available spot
+	STY nextPPUAddr
+	
+	JMP ReadADone		; Return, projectile spawn done
+	
+
+	
+noProjectile:
+	JMP ReadADone		; Return
+
+
+noProjectilePPUTooHigh:
+	LDY #$10			; Reset nextPPUAddr to 10
+	STY nextPPUAddr
+	RTS
 
 ;;;;;;;;;;;;;;  
   
@@ -220,6 +357,9 @@ sprites:
 	.db $D0, $00, %01000000, $88	;sprite 1
 	.db $D8, $10, %00000000, $80	;sprite 2
 	.db $D8, $10, %01000000, $88	;sprite 3
+	
+projectile:
+	.db $CA, $01, %00000000  ; Here will go X 
 	
 	;76543210
 	;|||   ||
