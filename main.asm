@@ -8,12 +8,14 @@
 
   .rsset $0000
 	
-score		.rs 2	; player 1 gamepad buttons, one bit per button
 seed		.rs 1	; Seed for the Pseudo Random Number Generator
 rand		.rs 1	; Address to store random number
 nextPPUAddr	.rs 1	; Address to store the next PPU address available to copy
 ballXAddr	.rs 1	; Address to store projectile's X coord when spawned
 cooldown	.rs 1	; Address to store projectile's cooldown after shooting
+
+difficulty1	.rs 1	; Difficulty level
+difficulty2	.rs 1
 
 
 
@@ -305,9 +307,14 @@ spawnProjectile:
 	LDX #$00
 	LDY nextPPUAddr
 	CPY #$20
-	BPL noProjectilePPUTooHigh
+	BEQ resetPPUAddr
+	JMP shootProj
+	;BPL noProjectilePPUTooHigh
+resetPPUAddr:
+	LDY #$10
+	STY nextPPUAddr
 	
-	
+shootProj:
 	LDA projectile, X	; load data from address (projectile + x)
 	STA $0200, Y		; store into RAM address ($0200 + y)
 	INY
@@ -348,8 +355,9 @@ noProjectilePPUTooHigh:
 	.bank 1
 	.org $E000
 palette:
-	.db $22,$29,$1A,$0F,  $22,$36,$17,$0F,  $22,$30,$21,$0F,  $22,$27,$17,$0F	; Background palette
-	.db $0F,$00,$12,$21,  $22,$02,$38,$3C,  $22,$1C,$15,$14,  $22,$02,$38,$3C	; Sprite palette
+	.db $0F,$00,$00,$00,  $00,$00,$00,$00,  $00,$00,$00,$00,  $00,$00,$00,$00	; Background palette
+	.db $0F,$00,$12,$21,  $0F,$17,$28,$39,  $00,$00,$00,$00,  $00,$00,$00,$00	; Sprite palette
+	;	spaceship/proj.   meteor 
 
 sprites:
 	;   vert tile attr       horiz
@@ -359,7 +367,11 @@ sprites:
 	.db $D8, $10, %01000000, $88	;sprite 3
 	
 projectile:
-	.db $CA, $01, %00000000  ; Here will go X 
+	.db $CA, $01, %00000000	 ; Here will go X
+	
+meteor:
+	;	vert tile attr       horiz
+	.db $10, $02, $00000001	 ; Here will go X
 	
 	;76543210
 	;|||   ||
@@ -386,7 +398,3 @@ projectile:
   .bank 2
   .org $0000
   .incbin "chr.chr"	;Includes 8KB graphics file
-  
-  
-  .bank 3
-  .org $E000
