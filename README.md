@@ -15,3 +15,7 @@ Right now, the game is veeery new, you just move the spaceship side to side and 
 
 ## How to compile & run
 You can straight up run the main.nes file using a NES emulator (like FCEUX), but if you modify the code, you just have to run build.bat and it will create two output files: main.fns and main.nes. Run main.nes on an emulator and you're done. 
+
+## Controls
+D-pad: move left/right
+A: shoot plasma projectiles
