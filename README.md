@@ -12,3 +12,6 @@ I like old hardware, because usually it is "simpler". Programming might not be v
 Right now, the game is veeery new, you just move the spaceship side to side and shoot 4 plasma projectiles, and that's it.
 
 ![Screenshot of the proto-02 version](screenshots/proto-02.png)
+
+## How to compile & run
+You can straight up run the main.nes file using a NES emulator (like FCEUX), but if you modify the code, you just have to run build.bat and it will create two output files: main.fns and main.nes. Run main.nes on an emulator and you're done. 
